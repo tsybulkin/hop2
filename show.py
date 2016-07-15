@@ -36,7 +36,7 @@ def draw_line(f, points_list, width, color, tau):
 
 
 def px(xy):
-	return ( 100+round(xy[0]*1500), 600-round(xy[1]*1500) )
+	return ( 100+round(xy[0]*1000), 600-round(xy[1]*1000) )
 
 
 
