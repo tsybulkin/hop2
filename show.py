@@ -7,6 +7,11 @@ x,y = 0.3, 0 # coords of the toe tip
 def show(anim_file, state_log,tau):
 	f = open(anim_file,'w')
 	f.write("<html>\n<body>\n<svg width='1000' height='650'>\n")
+	X1,Y1 = px((0,0))
+	X2,Y2 = px((1,0))
+	f.write("<line x1='%i' y1='%i' x2='%i' y2='%i' \
+		style='stroke:grey;stroke-width:3'/>\n" %(X1,Y1,X2,Y2) )
+	
 
 	draw_line(f,[((x,y),(x+L2*cos(b),y+L2*sin(b))) for (x,y,_,b) in state_log ],3,'blue',tau)
 	draw_line(f,[((x+L2*cos(b),y+L2*sin(b)),(x+L2*cos(b)+2*L1*cos(a+b),y+L2*sin(b)+2*L1*sin(a+b))) 

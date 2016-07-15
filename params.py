@@ -16,4 +16,4 @@ k1 = 500 # spring's coeffs
 k2 = 500
 dz = 0.05 # initial stretch of the springs
 
-miu_a = 0.0096
+miu_a = 0.0094

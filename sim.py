@@ -22,10 +22,10 @@ def run(T, speedup=0.1, tau=0.001):
 
 
 class Robot():
-	def __init__(self,x=0.8, y=0., a=2.35, b=1.25):
+	def __init__(self,x=0.3, y=0., a=2.2, b=1.0):
 		self.q = np.array([x,y,a,b])
 		self.q_d = np.zeros(4)
-		self.psi = 0.8
+		self.psi = 0.6
 		self.state_log = []
 
 	def correct_state(self,tau):
@@ -51,14 +51,14 @@ class Robot():
 	def next_pos(self,tau):
 		if self.q[1] > 0.: # flies
 			self.q_d = self.next_flying_pos(tau)
-			print 'flying:',self.q, self.q_d
+			#print 'flying:',self.q, self.q_d
 			self.q += tau * self.q_d
 			if self.q[1] < 0: self.correct_state(tau)
 				
 		else: # stands
 			qd_s = self.next_standing_pos(tau)
 			qd_f = self.next_flying_pos(tau)
-			print 'standing:', self.q, self.q_d
+			#print 'standing:', self.q, self.q_d
 				
 			if qd_f[1] > 0.: self.q_d = qd_f
 			else: self.q_d = qd_s
@@ -99,8 +99,9 @@ class Robot():
 		
 
 	def fell(self):
-		_,_,a,b = self.q
-		return b < 0 or L2*np.sin(b) + 2*L1*np.sin(a+b) < 0
+		_,y,a,b = self.q
+		return y + L2*np.sin(b) < 0 or \
+			   y + L2*np.sin(b) + 2*L1*np.sin(a+b) < 0
 
 
 
