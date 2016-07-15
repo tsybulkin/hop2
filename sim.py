@@ -34,10 +34,10 @@ class Robot():
 		self.state_log = []
 
 	def init_randomly_standing(self):
-		self.q = np.array([0.4, 0., np.random.uniform(0.1, 3.),np.random.uniform(0.1,1.5)])
+		self.q = np.array([0.4, 0., np.random.uniform(0.1, 3.),np.random.uniform(0.1,1.8)])
 
 	def correct_state(self,tau):
-		self.q[1] = 0.
+		#self.q[1] = 0.
 		x,y,a,b = self.q
 		
 		A = np.array([
@@ -111,14 +111,20 @@ class Robot():
 		speedup = 0.1
 		for _ in range(episode_nbr):
 			self.init_randomly()
+			state = get_state(self.q,self.q_d)
+			action = self.get_policy(state,self.Q[behavior])
+			psi = get_psi(action)
 			t = 0
 			while t < episode_len:
+				t += tau
 				if t%10 == 0: 
-					action = self.get_policy(get_state(self.q,self.q_d),behavior)
+					next_state = get_state(self.q,self.q_d)
+					rew = reward_func[behavior](state,action,next_state,self.Q[behavior])
+					action = self.get_policy(next_state,self.Q[behavior])
+					state = next_state
 					psi = get_psi(action)
 				self.next_pos(tau)
 				self.psi = psi # latency for one step added intentionally 
-				t += tau
 				if bot.fell(): break
 
 			show(behavior+'.html',bot.state_log,tau/speedup)
