@@ -2,7 +2,8 @@ from params import *
 import numpy as np
 import eqs, eqf
 from show import show
-from reinforce import *
+import reinforce
+from reinforce import reward_balance, reward_hop, reward_salto
 
 
 def run(T, speedup=0.1, tau=0.001):
@@ -19,7 +20,7 @@ def run(T, speedup=0.1, tau=0.001):
 		t += tau
 		if bot.fell(): break
 
-	show('no_control.html',bot.state_log,tau/speedup)
+	show('no_control.html',bot.pos_log,tau/speedup)
 
 
 class Robot():
@@ -31,10 +32,12 @@ class Robot():
 		self.reward_func = {'balance':'reward_balance', 
 							'hop':'reward_hop',
 							'salto':'reward_salto'}
-		self.state_log = []
+		self.pos_log = []
 
 	def init_randomly_standing(self):
 		self.q = np.array([0.4, 0., np.random.uniform(0.1, 3.),np.random.uniform(0.1,1.8)])
+		self.q_d = np.zeros(4)
+
 
 	def correct_state(self,tau):
 		#self.q[1] = 0.
@@ -66,8 +69,7 @@ class Robot():
 			
 			self.q += tau * self.q_d
 
-		self.state_log.append(tuple(self.q))
-
+		
 
 	def next_standing_pos(self,tau):
 		C = np.array([
@@ -109,27 +111,46 @@ class Robot():
 	def train(self, episode_len, episode_nbr, behavior='balance'):
 		tau = 0.001
 		speedup = 0.1
-		for _ in range(episode_nbr):
-			self.init_randomly()
-			state = get_state(self.q,self.q_d)
-			action = self.get_policy(state,self.Q[behavior])
-			psi = get_psi(action)
-			t = 0
-			while t < episode_len:
-				t += tau
-				if t%10 == 0: 
-					next_state = get_state(self.q,self.q_d)
-					rew = reward_func[behavior](state,action,next_state,self.Q[behavior])
-					action = self.get_policy(next_state,self.Q[behavior])
-					state = next_state
-					psi = get_psi(action)
-				self.next_pos(tau)
-				self.psi = psi # latency for one step added intentionally 
-				if bot.fell(): break
-
-			show(behavior+'.html',bot.state_log,tau/speedup)
-
+		self.pos_log = []
+		for j in range(episode_nbr):			
+			self.run_episode(episode_len,tau,behavior,'train')
+			if (j+1)%10 == 0: print "%i episodes run" % (j+1)
+	
+		self.run_episode(episode_len,tau,behavior,'show')
 		
+		show(behavior+'.html',self.pos_log,tau/speedup)
+
+
+	def run_episode(self, episode_len, tau, behavior, mode):
+		t = 0
+		reward = getattr(reinforce, self.reward_func[behavior])
+		if mode == 'train': self.init_randomly_standing()
+		elif mode == 'show': 
+			self.q = np.array([0.4, 0., 1.5, 1.1])
+			self.q_d = np.zeros(4)
+
+		state = reinforce.get_state(self.q,self.q_d)
+		action = reinforce.get_policy(state,self.Q[behavior])
+		psi = reinforce.get_psi(action)
+		i = 0
+		while t < episode_len:
+			t += tau
+			i += 1
+			if i%10 == 0: 
+				next_state = reinforce.get_state(self.q,self.q_d)
+				rwd = reward(state,action,next_state,self.Q[behavior])
+				if mode == 'train': reinforce.learn(self.Q[behavior],state,action,next_state,rwd)
+				
+				action = reinforce.get_policy(next_state,self.Q[behavior])
+				state = next_state
+				psi = reinforce.get_psi(action)
+
+			if mode == 'show': self.pos_log.append(tuple(self.q))
+			
+			self.next_pos(tau)
+			self.psi = psi # latency for one step added intentionally 
+
+			if self.fell(): break
 
 
 

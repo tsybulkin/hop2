@@ -12,8 +12,8 @@ I2 = m2 * (L2**2) / 12
 z0 = 0.02 # leverage of the leg's servo
 z1 = 0.02 
 z2 = 0.02
-k1 = 500 # spring's coeffs
-k2 = 500
+k1 = 300 # spring's coeffs
+k2 = 300
 dz = 0.05 # initial stretch of the springs
 
-miu_a = 0.0094
+miu_a = 0.015
