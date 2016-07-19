@@ -1,6 +1,6 @@
 from params import *
 import numpy as np
-import eqs, eqf
+import eqs, eqf, eqf2s
 from show import show
 import reinforce
 from reinforce import reward_balance, reward_hop, reward_salto
@@ -13,8 +13,12 @@ def run(T, speedup=0.1, tau=0.001):
 	assert T > 0
 
 	bot = Robot()
-	bot.q = np.array([0.3, 0., 2.8, 1.2])
-	bot.psi = 1.
+	"""
+	bot.q = np.array([0.3, 0., 3., 0.65]) # salto sttings
+	bot.psi = 1.1"""
+	bot.q = np.array([0.7, 0., 2.0, 1.255]) # salto sttings
+	bot.psi = 0.9
+	
 	t = 0
 	while t < T:
 		#bot.psi = get_psi(get_policy(EPS,bot.q,bot.q_d))
@@ -27,7 +31,7 @@ def run(T, speedup=0.1, tau=0.001):
 
 
 class Robot():
-	def __init__(self,x=0.3, y=0., a=2.2, b=1.2):
+	def __init__(self,x=0.3, y=0., a=2.2, b=1.3):
 		self.q = np.array([x,y,a,b])
 		self.q_d = np.zeros(4)
 		self.psi = 0.3
@@ -46,6 +50,7 @@ class Robot():
 	def correct_state(self):
 		#self.q[1] = 0.
 		x,y,a,b = self.q
+		dx,dy,da,db = self.q_d
 		
 		A = np.array([
 			[-L1*np.sin(a+b),  -L2*np.sin(b)-L1*np.sin(a+b)],
@@ -54,42 +59,50 @@ class Robot():
 		try:
 			A1 = np.linalg.inv(A)
 		except:
+			print 'singularity during landing:'
+			print self.q,self.q_d
 			self.q_d = np.array([0., 0., self.q_d[2]+0, self.q_d[3]+0])
+			return False
 		else:
-			da,db = A1.dot(np.array([self.q_d[0],self.q_d[1]]))	
-			self.q_d = np.array([0., 0., self.q_d[2]+da, self.q_d[3]+db])
+			v1 = self.q_d[:2] + L2*db*np.array([-np.sin(b), np.cos(b)]) \
+						+ L1*(da+db)*np.array([-np.cos(a+b),np.sin(a+b)])
+
+			da,db = A1.dot(v1)	
+			self.q_d = np.array([0., 0., da, db])
+			self.q[1] = 0.
+			return True
 
 	def correct_state1(self):
 		x,y,a,b = self.q
 		dx,dy,da,db = self.q_d
 		print 'velosities:',self.q_d
-		v2 = db*np.array([dx-L2*np.sin(b), dy+L2*np.cos(b)])
-		v1 = v2 + L1+(da+db)*np.array([-np.sin(a+b), np.cos(a+b)])
-		A = np.array([[-L1*np.sin(a+b), -L1*np.sin(a+b)],
-						[L1*np.cos(a+b), L2*np.cos(a+b)],
-						[0  ,-L2*np.sin(b)],
-						[0  , L2*np.cos(b)]])
-		U,S,V = np.linalg.svd(A)
-		print 'U:', U
-		print 'V:',V
-		print 'singulars:',S
-		print np.hstack([v1-v2,v2])
-		b1 = U.transpose().dot(np.hstack([v1-v2,v2]))
-		print 'b1:',b1
-		b11 = b1[:2]/S
-		print 'b11:',b11
-		da1,db1 = V.dot(b11)
+		v2 = np.array([dx,dy]) + L2*db*np.array([-np.sin(b), np.cos(b)])
+		v1 = v2 + L1*(da+db)*np.array([-np.sin(a+b), np.cos(a+b)])
+		
+		da1 = np.cross(np.array([np.cos(a+b),np.sin(a+b)]), v1) / L1
+		db1 = np.cross(np.array([np.cos(b),np.sin(b)]), v2) / L2
+
 		print 'new angular velosities:', da1,db1
-		self.q_d = np.array([0,0,da1,db1])
+		self.q_d[0] = 0
+		self.q_d[1] = 0
+		self.q_d[2] = da1
+		self.q_d[3] = db1
+		
 		self.q[1] = 0
+		
+		if abs(da1) > 100 or abs(db1) > 100: return False
+		else: return True
 		
 
 	def next_pos(self,tau):
 		if self.q[1] > 0.: # flies
 			self.q_d = self.next_flying_pos(tau)
+			if self.q_d[1] > 0 and self.q[1] > 0.05: self.psi = -0.6
+			elif self.q_d[1] < 0 and self.q[1] < 0.01: self.psi = 0.7
 			#print 'flying:',self.q, self.q_d
 			self.q += tau * self.q_d
-			if self.q[1] < 0: self.correct_state1()
+			if self.q[1] < 0: return self.correct_state1()
+			else: return True
 				
 		else: # stands
 			qd_s = self.next_standing_pos(tau)
@@ -100,7 +113,7 @@ class Robot():
 			else: self.q_d = qd_s
 			
 			self.q += tau * self.q_d
-
+			return True
 		
 
 	def next_standing_pos(self,tau):
@@ -131,12 +144,13 @@ class Robot():
 			])
 		
 		return self.q_d + tau * np.linalg.inv(C).dot(D)
-		
+			
 
 	def is_down(self):
 		_,y,a,b = self.q
 		return y + L2*np.sin(b) < 0 or \
-			   y + L2*np.sin(b) + 2*L1*np.sin(a+b) < 0
+			   y + L2*np.sin(b) + 2*L1*np.sin(a+b) < 0 or \
+			   a > 3.1 or a < 0.
 
 
 
@@ -180,13 +194,18 @@ class Robot():
 				action = reinforce.get_policy(eps,next_state,self.Q[behavior])
 				state = next_state
 				self.psi = reinforce.get_psi(state,action)
-				if mode == 'show': print "  action:",action
+				#if mode == 'show': print "  action:",action
 
 			if mode == 'show': 
-				print "state:",state
+				#print "state:",state
 				self.pos_log.append(tuple(self.q))
 			
-			self.next_pos(tau)
+			if not self.next_pos(tau): 
+				print "too large load duirng landing"
+				rwd = -10
+				next_state = 'down'
+				reinforce.learn(self.Q[behavior],state,action,next_state,rwd)
+				break
 			
 			if self.is_down(): 
 				rwd = 0
