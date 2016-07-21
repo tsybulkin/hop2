@@ -13,12 +13,12 @@ def run(T, speedup=0.1, tau=0.001):
 	assert T > 0
 
 	bot = Robot()
+	bot.q = np.array([0.1, 0., 3., 0.65]) # salto sttings
+	bot.psi = 1.1
 	"""
-	bot.q = np.array([0.3, 0., 3., 0.65]) # salto sttings
-	bot.psi = 1.1"""
 	bot.q = np.array([0.7, 0., 2.0, 1.255]) # salto sttings
 	bot.psi = 0.9
-	
+	"""
 	t = 0
 	while t < T:
 		#bot.psi = get_psi(get_policy(EPS,bot.q,bot.q_d))
@@ -31,7 +31,7 @@ def run(T, speedup=0.1, tau=0.001):
 
 
 class Robot():
-	def __init__(self,x=0.3, y=0., a=2.2, b=1.3):
+	def __init__(self,x=0.3, y=0., a=1.8, b=1.3):
 		self.q = np.array([x,y,a,b])
 		self.q_d = np.zeros(4)
 		self.psi = 0.3
@@ -75,14 +75,14 @@ class Robot():
 	def correct_state1(self):
 		x,y,a,b = self.q
 		dx,dy,da,db = self.q_d
-		print 'velosities:',self.q_d
+		#print 'velosities:',self.q_d
 		v2 = np.array([dx,dy]) + L2*db*np.array([-np.sin(b), np.cos(b)])
 		v1 = v2 + L1*(da+db)*np.array([-np.sin(a+b), np.cos(a+b)])
 		
 		da1 = np.cross(np.array([np.cos(a+b),np.sin(a+b)]), v1) / L1
 		db1 = np.cross(np.array([np.cos(b),np.sin(b)]), v2) / L2
 
-		print 'new angular velosities:', da1,db1
+		#print 'new angular velosities:', da1,db1
 		self.q_d[0] = 0
 		self.q_d[1] = 0
 		self.q_d[2] = da1
@@ -97,8 +97,8 @@ class Robot():
 	def next_pos(self,tau):
 		if self.q[1] > 0.: # flies
 			self.q_d = self.next_flying_pos(tau)
-			if self.q_d[1] > 0 and self.q[1] > 0.05: self.psi = -0.6
-			elif self.q_d[1] < 0 and self.q[1] < 0.01: self.psi = 0.7
+			#if self.q_d[1] > 0 and self.q[1] > 0.05: self.psi = -0.6
+			#elif self.q_d[1] < 0 and self.q[1] < 0.01: self.psi = 0.7
 			#print 'flying:',self.q, self.q_d
 			self.q += tau * self.q_d
 			if self.q[1] < 0: return self.correct_state1()
