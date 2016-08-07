@@ -37,6 +37,7 @@ def get_best_learned_action(state, Q):
 	if V < 2: return get_random_action(state) 
 	else: return Ac
 	
+# Actions: [-1, 0 , 1] - means turn motor right or left for in one discrete position
 
 def get_random_action(state): 
 	psi = state[0]

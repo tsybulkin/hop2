@@ -1,11 +1,33 @@
 from params import *
 import numpy as np
-import eqs, eqf, eqf2s
+import eqs, eqf
 from show import show
 import reinforce
 from reinforce import reward_balance, reward_hop, reward_salto
 
 EPS = 0.2
+
+
+def run_wss(T, speedup=0.1, tau=0.001):
+	bot = Robot()
+	bot.q = np.array([0.3, 0., 1.7, 1.25]) 
+	bot.psi = 0.3
+	
+	t = 0.
+	while t < T:
+		sim_time, action = bot.balance_policy(tau*10,0.5)
+		bot.psi += action/5.
+		print "action:",action,"bot state:",bot.q, bot.q_d
+		
+		[ bot.next_pos(tau) for _ in range(10)]
+		t += tau*10
+		bot.pos_log.append(tuple(bot.q))
+		if bot.is_down(): break
+
+	show('short_sims.html',bot.pos_log,tau/speedup)
+
+
+
 
 def run(T, speedup=0.1, tau=0.001):
 	assert tau < 0.1
@@ -16,7 +38,7 @@ def run(T, speedup=0.1, tau=0.001):
 	bot.q = np.array([0.1, 0., 3., 0.65]) # salto sttings
 	bot.psi = 1.1
 	"""
-	bot.q = np.array([0.7, 0., 2.0, 1.255]) # salto sttings
+	bot.q = np.array([0.7, 0., 2.0, 1.255]) # salto settings
 	bot.psi = 0.9
 	"""
 	t = 0
@@ -47,32 +69,8 @@ class Robot():
 		self.q_d = np.zeros(4)
 
 
+	
 	def correct_state(self):
-		#self.q[1] = 0.
-		x,y,a,b = self.q
-		dx,dy,da,db = self.q_d
-		
-		A = np.array([
-			[-L1*np.sin(a+b),  -L2*np.sin(b)-L1*np.sin(a+b)],
-			[ L1*np.cos(a+b),   L2*np.cos(b)+L1*np.cos(b)]
-			])
-		try:
-			A1 = np.linalg.inv(A)
-		except:
-			print 'singularity during landing:'
-			print self.q,self.q_d
-			self.q_d = np.array([0., 0., self.q_d[2]+0, self.q_d[3]+0])
-			return False
-		else:
-			v1 = self.q_d[:2] + L2*db*np.array([-np.sin(b), np.cos(b)]) \
-						+ L1*(da+db)*np.array([-np.cos(a+b),np.sin(a+b)])
-
-			da,db = A1.dot(v1)	
-			self.q_d = np.array([0., 0., da, db])
-			self.q[1] = 0.
-			return True
-
-	def correct_state1(self):
 		x,y,a,b = self.q
 		dx,dy,da,db = self.q_d
 		#print 'velosities:',self.q_d
@@ -93,6 +91,13 @@ class Robot():
 		if abs(da1) > 100 or abs(db1) > 100: return False
 		else: return True
 		
+	def copy(self):
+		b = Robot()
+		b.q = self.q.copy()
+		b.q_d = self.q_d.copy()
+		b.psi = self.psi
+		return b
+
 
 	def next_pos(self,tau):
 		if self.q[1] > 0.: # flies
@@ -101,7 +106,7 @@ class Robot():
 			#elif self.q_d[1] < 0 and self.q[1] < 0.01: self.psi = 0.7
 			#print 'flying:',self.q, self.q_d
 			self.q += tau * self.q_d
-			if self.q[1] < 0: return self.correct_state1()
+			if self.q[1] < 0: return self.correct_state()
 			else: return True
 				
 		else: # stands
@@ -146,12 +151,34 @@ class Robot():
 		return self.q_d + tau * np.linalg.inv(C).dot(D)
 			
 
-	def is_down(self):
+	def is_down(self): ## if robot fell down
 		_,y,a,b = self.q
 		return y + L2*np.sin(b) < 0 or \
 			   y + L2*np.sin(b) + 2*L1*np.sin(a+b) < 0 or \
 			   a > 3.1 or a < 0.
 
+	def balance_policy(self,tau,T):
+		b_times = [ (self.balance_time(action,tau,T),action) for action in [-1,0,1]]
+		print b_times
+
+		return max(b_times)
+
+
+	def balance_time(self,action,tau,T):
+		botc = self.copy()
+		botc.psi += action/5.
+		if abs(botc.psi) >= 1.: return 0.
+
+		t = 0.
+		while t < T:
+			t += tau
+			if not botc.next_pos(tau): 
+				print "too large load duirng landing"
+				break			
+			if botc.is_down(): 
+				break
+
+		return t - abs(action)/100.
 
 
 	def train(self, episode_len, episode_nbr, behavior='balance'):
@@ -169,7 +196,7 @@ class Robot():
 
 	def run_episode(self, episode_len, tau, behavior, mode):
 		t = 0
-		reward = getattr(reinforce, self.reward_func[behavior])
+		reward = getattr(reinforce, self.reward_func[behavior]) # rewarding function
 		if mode == 'train': 
 			self.init_randomly_standing()
 			eps = EPS
