@@ -10,17 +10,18 @@ EPS = 0.2
 
 def run_wss(T, speedup=0.1, tau=0.001):
 	bot = Robot()
-	bot.q = np.array([0.3, 0., 1.7, 1.25]) 
-	bot.psi = 0.3
+	bot.q = np.array([0.4, 0., 1.7, 1.35]) 
+	bot.psi = 0.5
 	
 	t = 0.
 	while t < T:
-		sim_time, action = bot.balance_policy(tau*10,0.5)
-		bot.psi += action/5.
+		sim_time, action = bot.balance_policy(tau,0.2)
+		bot.psi += action/10.
 		print "action:",action,"bot state:",bot.q, bot.q_d
 		
-		[ bot.next_pos(tau) for _ in range(10)]
-		t += tau*10
+		[ bot.next_pos(tau) for _ in range(5)]
+		t += tau*5
+
 		bot.pos_log.append(tuple(bot.q))
 		if bot.is_down(): break
 
@@ -150,35 +151,44 @@ class Robot():
 		
 		return self.q_d + tau * np.linalg.inv(C).dot(D)
 			
-
+	
 	def is_down(self): ## if robot fell down
 		_,y,a,b = self.q
-		return y + L2*np.sin(b) < 0 or \
-			   y + L2*np.sin(b) + 2*L1*np.sin(a+b) < 0 or \
+		return y + L2*np.sin(b) + 2*L1*np.sin(a+b) < 0 or \
+			   y + L2*np.sin(b) < 0 or \
 			   a > 3.1 or a < 0.
 
+	def fell_on_back(self):
+		_,y,a,b = self.q
+		if b <= 0.: return True
+		return False
+
+
 	def balance_policy(self,tau,T):
-		b_times = [ (self.balance_time(action,tau,T),action) for action in [-1,0,1]]
+		b_times = [ (abs(self.get_Vx(action,tau,T)),action) for action in [-1,0,1]]
 		print b_times
 
-		return max(b_times)
+		return min(b_times)
 
 
-	def balance_time(self,action,tau,T):
+	def get_Vx(self,action,tau,T):
 		botc = self.copy()
-		botc.psi += action/5.
-		if abs(botc.psi) >= 1.: return 0.
+		botc.psi += action/10.
+		if abs(botc.psi) >= 1.: return np.inf
 
 		t = 0.
 		while t < T:
 			t += tau
 			if not botc.next_pos(tau): 
 				print "too large load duirng landing"
-				break			
-			if botc.is_down(): 
+				return np.inf			
+			if botc.is_down():
+				if botc.fell_on_back(): print "fell on back"
+				else: print "fell forward"
 				break
-
-		return t - abs(action)/100.
+		da,db = botc.q_d[2:]
+		a,b = botc.q[2:]
+		return -L2*db*np.sin(b) - L1*(da+db)*np.sin(a+b)
 
 
 	def train(self, episode_len, episode_nbr, behavior='balance'):
