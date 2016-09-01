@@ -6,7 +6,7 @@ x,y = 0.3, 0 # coords of the toe tip
 
 def show(anim_file, state_log,tau):
 	f = open(anim_file,'w')
-	f.write("<html>\n<body>\n<svg width='1000' height='650'>\n")
+	f.write("<html>\n<body>\n<svg width='1100' height='650'>\n")
 	X1,Y1 = px((0,0))
 	X2,Y2 = px((1,0))
 	f.write("<line x1='%i' y1='%i' x2='%i' y2='%i' \

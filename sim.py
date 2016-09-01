@@ -36,13 +36,13 @@ def run(T, speedup=0.1, tau=0.001):
 	assert T > 0
 
 	bot = Robot()
-	bot.q = np.array([0.1, 0., 3., 0.65]) # salto sttings
+	bot.q = np.array([0.6, 0., 2.8, 1.5]) # 
 	bot.psi = 1.1
 	"""
 	bot.q = np.array([0.7, 0., 2.0, 1.255]) # salto settings
 	bot.psi = 0.9
 	"""
-	t = 0
+	t = 0.
 	while t < T:
 		#bot.psi = get_psi(get_policy(EPS,bot.q,bot.q_d))
 		bot.next_pos(tau)
@@ -70,7 +70,23 @@ class Robot():
 		self.q_d = np.zeros(4)
 
 
-	
+	def fly_to_stand(self):
+		a,b = self.q[2:]
+		vx,vy,va,vb = self.q_d
+		A = np.array([ [-L1*np.sin(a+b), -(L2*np.sin(b)+L1*np.sin(a+b)) ],
+						[L1*np.cos(a+b),  (L2*np.cos(b)+L1*np.cos(a+b))]])
+		C = np.array([vx,vy])
+
+		da,db = np.linalg.inv(A).dot(C)
+		print "da, db:", da,db
+		self.q_d = np.array([0.,0.,da+va,db+vb])
+		print "q_d:",self.q_d
+		self.q[1] = 0.
+		
+		if abs(da+va) > 100 or abs(db+vb) > 100: return False
+		else: return True
+		
+
 	def correct_state(self):
 		x,y,a,b = self.q
 		dx,dy,da,db = self.q_d
@@ -103,19 +119,18 @@ class Robot():
 	def next_pos(self,tau):
 		if self.q[1] > 0.: # flies
 			self.q_d = self.next_flying_pos(tau)
-			#if self.q_d[1] > 0 and self.q[1] > 0.05: self.psi = -0.6
-			#elif self.q_d[1] < 0 and self.q[1] < 0.01: self.psi = 0.7
-			#print 'flying:',self.q, self.q_d
 			self.q += tau * self.q_d
-			if self.q[1] < 0: return self.correct_state()
+			print 'q:', self.q, '  q_d:', self.q_d
+			
+			if self.q[1] < 0.: return self.fly_to_stand() #self.correct_state()
 			else: return True
 				
 		else: # stands
 			qd_s = self.next_standing_pos(tau)
 			qd_f = self.next_flying_pos(tau)
-			#print 'standing:', self.q, self.q_d
+			print 'qd_s:', qd_s, '  q_df:', qd_f
 				
-			if qd_f[1] > 0.: self.q_d = qd_f
+			if qd_f[1] > self.q[1]: self.q_d = qd_f
 			else: self.q_d = qd_s
 			
 			self.q += tau * self.q_d

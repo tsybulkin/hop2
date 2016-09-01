@@ -27,7 +27,7 @@ def get_c2(q, q_d, psi=0):
 	_,_,a_d,b_d = q_d
 
 	return np.array([
-		I1 + L1**2*m1 + L1**2*m1 + L1*L2*m1*np.cos(a),
+		I1 + L1**2*m1 + L1*L2*m1*np.cos(a),
 		I1 + I2 + (L1**2+L2**2)*m1 + 2*L1*L2*m1*np.cos(a) + L2**2*m2/4
 		])
 		
